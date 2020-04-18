@@ -1,118 +1,77 @@
 <template>
-    <div id="app" @mousedown="startDrawing" @mousemove="draw" @mouseup="stopDrawing">
-        <Space :coordinates="coordinates()" :cursor="cursor"/>
+    <div id="app">
+        <Space ref="space" :columns="columns" :rows="rows"
+               :cursor-type=cursorType :running=running :speed=speed></Space>
+        <Legend :cursor-type=cursorType :running=running :speed=speed></Legend>
     </div>
 </template>
 
 <script>
     import Space from './components/Space.vue'
-
-    //step();
+    import Legend from './components/Legend.vue'
 
     export default {
         name: 'App',
         components: {
-            Space
-        },
-        created() {
-            window.addEventListener('keypress', this.keyPressed)
+            Space, Legend
         },
         data: () => {
             return {
                 drawing: false,
                 handler: null,
-                content: {},
-                cursor: [0, 0]
+                cursorType: 'pointer',
+                cursorTypes: ['pointer',
+                    'glider0', 'glider1', 'glider2', 'glider3',
+                    'spaceship0', 'spaceship1', 'spaceship2', 'spaceship3'],
+                rows: 80,
+                columns: 160,
+                speed: 200,
+                running: false
             }
         },
+        created() {
+            window.addEventListener('keydown', this.keyPressed);
+        },
         methods: {
-            startDrawing(event) {
-                this.drawing = true;
-                this.draw(event)
-            },
-            stopDrawing() {
-                this.drawing = false;
-            },
-            draw(event) {
-                const i = Math.floor(event.offsetX / 10);
-                const j = Math.floor(event.offsetY / 10);
-                this.cursor = [i, j];
-                if (!this.drawing) {
-                    return;
-                }
-                this.content[i] = (this.content[i] || []);
-                this.content[i][j] = true;
-                this.$forceUpdate();
-            },
             keyPressed(event) {
                 switch (event.code) {
-                    case 'Enter':
                     case 'Space':
-                        this.pauseResume()
+                    case 'KeyS':
+                        this.pauseResume();
+                        break;
+                    case 'KeyC':
+                        this.clear();
                         break;
                     case 'KeyD':
-                        this.clear();
+                        this.speedUp();
+                        break;
+                    case 'KeyA':
+                        this.slowDown();
+                        break;
+                    case 'KeyW':
+                        this.toggleCursor();
                         break;
                 }
             },
             pauseResume() {
-                if (this.handler !== null) {
-                    clearInterval(this.handler)
-                    this.handler = null;
-                } else {
-                    const self = this;
-                    this.handler = setInterval(() => self.tick(), 100)
-                }
+                this.running = !this.running;
+            },
+            slowDown() {
+                this.pauseResume();
+                this.speed = Math.min(this.speed + 50, 1000);
+                this.pauseResume();
+            },
+            speedUp() {
+                this.pauseResume();
+                this.speed = Math.max(this.speed - 50, 50);
+                this.pauseResume();
+            },
+            toggleCursor() {
+                const typeIndex = this.cursorTypes.indexOf(this.cursorType);
+                this.cursorType = this.cursorTypes[(typeIndex + 1) % this.cursorTypes.length]
             },
             clear() {
-                this.content = {};
-            },
-            tick() {
-                const nextContent = {};
-                this.coordinates().forEach(point => {
-                    const community = this.getCommunityCoordinates(point);
-                    community.filter(this.isAlive).forEach(member => {
-                        nextContent[member[0]] = nextContent[member[0]] || [];
-                        nextContent[member[0]][member[1]] = true;
-                    })
-                });
-                this.content = nextContent;
-            },
-            coordinates() {
-                return Object.keys(this.content)
-                    .map(i => Object.keys(this.content[i])
-                        .filter(j => this.content[i][j])
-                        .map(j => [Number.parseInt(i), Number.parseInt(j), `${i}_${j}`])
-                    ).flatMap(m => m);
-            },
-            getSurrounding(point) {
-                const [i, j] = point;
-                return [
-                    [i - 1, j - 1],
-                    [i - 0, j - 1],
-                    [i + 1, j - 1],
-                    [i + 1, j - 0],
-                    [i + 1, j + 1],
-                    [i - 0, j + 1],
-                    [i - 1, j + 1],
-                    [i - 1, j - 0]
-                ].filter(this.inRange);
-            },
-            getCommunityCoordinates(point) {
-                return [[point], ...this.getSurrounding(point)];
-            },
-            inRange(p) {
-                return p[0] >= 0 && p[0] < 800 && p[1] >= 0 && p[1] < 600;
-            },
-            isAlive(point) {
-                const content = this.content;
-                const currentAlive = (content[point[0]] || [])[point[1]];
-                const neighbors = this.getSurrounding(point)
-                    .map(([i, j]) => (content[i] || [])[j] | 0)
-                    .reduce((sum, bit) => sum + bit, 0);
-                return currentAlive ?
-                    neighbors > 1 && neighbors < 4 :
-                    neighbors === 3;
+                this.$refs.space.clear();
             }
         }
     }
